@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Word Search Puzzle</title>
+    <style>
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            font-family: Arial, sans-serif;
+        }
+
+        #container {
+            display: flex;
+        }
+
+        #wordSearch {
+            border-collapse: collapse;
+        }
+
+        td {
+            width: 30px;
+            height: 30px;
+            text-align: center;
+            border: 1px solid #ddd;
+            cursor: pointer;
+        }
+
+        .highlight {
+            background-color: yellow;
+        }
+
+        #sidebar {
+            margin-left: 20px;
+        }
+
+        #wordList {
+            list-style-type: none;
+            padding: 0;
+        }
+
+        /* Add to your existing CSS */
+        li:contains {
+            display: block;
+        }
+
+        /* Add to your existing CSS */
+        .found {
+            text-decoration: line-through;
+            /* or any other styling for found words */
+        }
+
+        /* Add this style to make the button visually appealing */
+        #showWordsButton {
+            margin-top: 10px;
+            padding: 5px 10px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+
+        /* Add this style to your CSS */
+        td.found-word {
+            text-decoration: line-through;
+            color: #999;
+            /* Adjust color as needed */
+        }
+    </style>
+
+</head>
+
+<body>
+
+    <!--<h1>Word Search Puzzle</h1>
+    <p>Find the words:</p>-->
+
+    <div id="container">
+        <table id="wordSearch">
+            <!-- Word search grid will be dynamically added here -->
+        </table>
+        <div id="sidebar">
+            <h2>Words to Find:</h2>
+            <ul id="wordList"></ul>
+        </div>
+    </div>
+    <!-- Button to show all words in the grid -->
+    <button id="showWordsButton">Show All Words</button>
+    <!--<button id="check" onclick="checkWordFound">check word</button>-->
+
+
+    <script>
+        // URL to your text file
+        const dataUrl = 'core-wordnet.txt';
+
+        let wordsPlaced = [];
+        let wordsFound = 0;
+        let placement = {};
+        let highlightff = [];
+
+        // Fetch the data asynchronously
+        async function fetchData(url) {
+            try {
+                const response = await fetch(url);
+                const data = await response.text();
+                return data;
+            } catch (error) {
+                console.error('Error fetching data:', error);
+            }
+        }
+
+        // Entry point
+        async function initialize() {
+            // Fetch data from the text file
+            const data = await fetchData(dataUrl);
+
+            // Parse the data into an array of objects
+            const wordsToFind = parseData(data);
+
+            // Limit to a maximum of 10 words
+            const maxWords = 10;
+
+            let limitedWordsToFind = [];
+
+
+            //= wordsToFind.slice(0, maxWords);
+
+            //change from just the first ten words to random 10 words in list ie slice(*random,*random+10) or any 10 words
+            //loop to add random words to list
+            for (let i = 0; i < 10; i++) {
+                const randomIndex = Math.floor(Math.random() * wordsToFind.length);
+                console.log(randomIndex);
+                limitedWordsToFind.push(wordsToFind[randomIndex]);
+            }
+
+
+
+
+
+            // Word search grid size
+            const gridSize = 15;
+
+            // Generate word search grid and place words
+            const wordSearchGrid = generateWordSearchGrid(gridSize);
+
+            const wordList = limitedWordsToFind.map(obj => obj.word.toUpperCase());
+            //console.log("test");
+            //show the words
+            //console.log(wordList);
+
+            wordsPlaced = placeWords(wordSearchGrid, wordList);
+
+            console.log(wordsPlaced);
+
+            // Fill the grid with random letters
+            fillGrid(wordSearchGrid);
+
+            // Render the word search
+            renderWordSearch(wordSearchGrid);
+
+            // Update the sidebar with the current words to find
+            updateSidebar(wordsPlaced);
+
+
+
+            //console.log('After filling grid:', wordSearchGrid);
+
+        }
+
+        function fillGrid(grid) {
+            // Loop through the grid
+            for (let i = 0; i < grid.length; i++) {
+                const row = grid[i];
+                for (let j = 0; j < row.length; j++) {
+                    const cell = row[j];
+
+                    // Check if the cell is '1'
+                    if (grid[i][j] === 1 || grid[i][j] === '1') {
+                        // If the cell is empty, generate a random letter
+                        const randomLetter = getRandomLetter();
+
+                        //print char at i,j position to console
+                        //console.log(grid[i][j]);
+                        // Assign the random letter to the cell
+                        grid[i][j] = randomLetter;
+                    }
+
+                }
+            }
+        }
+        //function to generate a random letter
+        function getRandomLetter() {
+            const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+            const randomIndex = Math.floor(Math.random() * alphabet.length);
+            return alphabet[randomIndex];
+        }
+
+        function parseData(data) {
+            const regex = /\w+ \[([\w%-]+)%[^:]+:[^:]+:[^:]+::\] \[([\w]+)](?: (\w+.*))?/g;
+            const words = [];
+            let match;
+            while ((match = regex.exec(data)) !== null) {
+                const sense = match[1];
+                const word = match[2];
+                const definition = match[3] || '';
+                words.push({ word, sense, definition });
+            }
+            return words;
+        }
+
+
+        function updateSidebar(wordsPlaced) {
+            const wordListElement = document.getElementById('wordList');
+            wordListElement.innerHTML = ''; // Clear existing list
+
+            wordsPlaced.forEach(wordObj => {
+                const listItem = document.createElement('li');
+                listItem.textContent = wordObj.word;
+                wordListElement.appendChild(listItem);
+            });
+        }
+
+        function generateWordSearchGrid(size) {
+            // Ensure grid size is large enough to accommodate word lengths
+            const grid = [];
+            for (let i = 0; i < size; i++) {
+                const row = [];
+                for (let j = 0; j < size; j++) {
+                    row.push('1'); // number 1 string represents an empty cell
+                }
+                grid.push(row);
+            }
+            return grid;
+        }
+
+
+        function placeWords(grid, words) {
+            const wordsPlaced = [];
+            for (const word of words) {
+                const direction = Math.random() < 0.5 ? 'horizontal' : 'vertical';
+                const placement = placeWord(grid, word, direction);
+                if (placement) {
+                    wordsPlaced.push(placement);
+                }
+            }
+            return wordsPlaced;
+        }
+
+
+        function placeWord(grid, word, direction) {
+            const size = grid.length;
+            const wordLength = word.length;
+
+            let row, col;
+
+            if (direction === 'horizontal') {
+                row = Math.floor(Math.random() * size);
+                col = Math.floor(Math.random() * (size - wordLength + 1));
+
+            } else {
+                row = Math.floor(Math.random() * (size - wordLength + 1));
+                col = Math.floor(Math.random() * size);
+            }
+
+            placement = { word, direction, row, col };
+
+            for (let i = 0; i < wordLength; i++) {
+                const letter = word[i];
+                if (grid[row][col] === '1') {
+                    grid[row][col] = letter;
+                }
+                else if (grid[row][col] === letter) {
+                    console.log("Letter already placed");
+                    return null;
+
+                } else {
+                    console.log("Word placement not possible");
+                    return null;
+                }
+
+                if (direction === 'horizontal') {
+                    col++;
+                } else {
+                    row++;
+                }
+            }
+            return placement;
+        }
+
+        function renderWordSearch(grid) {
+            const table = document.getElementById('wordSearch');
+            table.innerHTML = ''; // Clear existing table content
+            for (let i = 0; i < grid.length; i++) {
+                const row = document.createElement('tr');
+                for (let j = 0; j < grid[i].length; j++) {
+                    const cell = document.createElement('td');
+                    const cellContent = grid[i][j] ? grid[i][j] : ''; // If a letter is present, use it; otherwise, leave the cell empty
+                    cell.textContent = cellContent;
+                    cell.addEventListener('click', () => highlightCell(cell));
+                    row.appendChild(cell);
+                }
+                table.appendChild(row);
+            }
+        }
+
+
+
+        let wordCompleted = false;
+        let currentWordIsHighlighted = false;
+
+        // Add a global variable to track the highlighted text
+        let highlightedText = '';
+
+        // Modify your highlightCell function
+        function highlightCell(cell) {
+            // Toggle the 'highlight' class
+            cell.classList.toggle('highlight');
+
+            // Update the highlightedText based on the current state of the grid
+            highlightedText = getHighlightedText();
+
+            // Print highlighted text to console
+            console.log(highlightedText);
+
+            // Check if the highlighted text matches any words
+            // Check if the highlighted text matches any wordsplaced
+            // Loop through wordsplaced
+            for (let i = 0; i < wordsPlaced.length; i++) {
+                const wordCells = getWordCells(wordsPlaced[i]);
+                if (wordCells.every(cell => cell.classList.contains('highlight'))) {
+                    alert(`Found: ${wordsPlaced[i].word.word}`);
+                    // clearHighlights();
+                    checkWordCompletion();
+
+                    // Remove the word found from wordsplaced
+                    // So if highlighted text is found again it won't be found again
+                    for (let j = 0; j < wordsPlaced.length; j++) {
+                        if (wordsPlaced[j].word.word === highlightedText) {
+                            wordsPlaced.splice(j, 1);
+                        }
+                    }
+                    clearHighlights();
+
+                    // Clear the highlightedtext
+                    highlightedText = '';
+                }
+            }
+        }
+
+
+        // Define the getHighlightedText function
+        function getHighlightedText() {
+            let result = '';
+
+            // Logic to extract the highlighted text from the grid
+            // Implement as per your grid structure
+            // For example, you might iterate through cells and concatenate the highlighted letters
+
+            // Assuming a table with id 'wordSearch'
+            const table = document.getElementById('wordSearch');
+            const rows = table.getElementsByTagName('tr');
+
+            for (let i = 0; i < rows.length; i++) {
+                const cells = rows[i].getElementsByTagName('td');
+                for (let j = 0; j < cells.length; j++) {
+                    const cell = cells[j];
+                    if (cell.classList.contains('highlight')) {
+                        result += cell.textContent;
+                    }
+                }
+            }
+
+            return result;
+        }
+
+        // Define the findMatchingWord function
+        function findMatchingWord(highlightedText) {
+            // Logic to check if the highlighted text matches any words
+            // Iterate through your wordsPlaced array and compare the word with highlightedText
+
+            for (const placement of wordsPlaced) {
+                if (highlightedText === placement.word.word) {
+                    return { word: placement.word, placement: placement };
+                }
+            }
+
+            return null; // Return null if no match
+        }
+
+
+
+
+
+
+        function checkWordFound() {
+            for (const placement of wordsPlaced) {
+                const wordCells = getWordCells(placement);
+                if (wordCells.every(cell => cell.classList.contains('highlight'))) {
+                    alert(`Found: ${placement.word.word}`);
+                    clearHighlights();
+                }
+            }
+        }
+        // checks if word is found and call checkWordCompletion
+        function checkWordFound() {
+            for (const placement of wordsPlaced) {
+                const wordCells = getWordCells(placement);
+                if (wordCells.every(cell => cell.classList.contains('highlight'))) {
+                    alert(`Found: ${placement.word.word}`);
+                    clearHighlights();
+                    checkWordCompletion();
+                }
+            }
+        }
+        // Add this function to get the cells for a word placement
+        function getWordCells(placement) {
+            const { word, direction, row, col } = placement;
+            const cells = [];
+            for (let i = 0; i < word.length; i++) {
+                const cell = document.querySelector(`#wordSearch tr:nth-child(${row + 1 + (direction === 'vertical' ? i : 0)}) td:nth-child(${col + 1 + (direction === 'horizontal' ? i : 0)})`);
+                cells.push(cell);
+            }
+            return cells;
+        }
+
+        function getWordCells(placement) {
+            const { word, direction, row, col } = placement;
+            const cells = [];
+            for (let i = 0; i < word.length; i++) {
+                const cell = document.querySelector(`#wordSearch tr:nth-child(${row + 1 + (direction === 'vertical' ? i : 0)}) td:nth-child(${col + 1 + (direction === 'horizontal' ? i : 0)})`);
+                cells.push(cell);
+            }
+            return cells;
+        }
+
+        function clearHighlights() {
+            const highlightedCells = document.querySelectorAll('.highlight');
+            highlightedCells.forEach(cell => cell.classList.remove('highlight'));
+        }
+
+
+
+
+        function checkWordCompletion() {
+            wordsFound++;
+            console.log(wordsFound);
+
+
+
+
+
+
+            if (wordsFound === wordsPlaced.length) {
+                alert("Congratulations! All words found. Moving to the next level.");
+                // Perform actions to move to the next level
+                wordsFound = 0; // Reset the count for the next level
+                initialize(); // Start the next level
+                return true;
+            }
+            return false;
+        }
+
+        // Call the initialize function
+
+        // Add this function to show all words in the grid
+        function showAllWords() {
+            // Iterate through all placed words and highlight their cells
+            for (const placement of wordsPlaced) {
+                const wordCells = getWordCells(placement);
+                wordCells.forEach(cell => cell.classList.add('highlight'));
+            }
+        }
+
+        // Add an event listener to the "Show All Words" button
+        const showWordsButton = document.getElementById('showWordsButton');
+        showWordsButton.addEventListener('click', showAllWords);
+        initialize();
+    </script>
+
+</body>
+
+</html>
